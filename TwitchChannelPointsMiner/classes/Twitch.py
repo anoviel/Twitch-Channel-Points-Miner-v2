@@ -341,5 +341,5 @@ class Twitch:
         )
         try:
             streamer.viewer_is_mod = response["data"]["user"]["self"]["isModerator"]
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError):
             streamer.viewer_is_mod = False

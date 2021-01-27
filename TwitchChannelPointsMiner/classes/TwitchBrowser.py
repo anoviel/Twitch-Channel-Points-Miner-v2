@@ -21,17 +21,19 @@ from TwitchChannelPointsMiner.classes.EventPrediction import EventPrediction
 from TwitchChannelPointsMiner.utils import bet_condition
 from TwitchChannelPointsMiner.constants import (
     TWITCH_URL,
-    cookiePolicyQuery,
+    cookiePolicyCSS,
     streamCoinsMenuXP,
     streamCoinsMenuJS,
-    streamBetTitleInBet,
-    streamBetCustomVoteXP,
+    streamBetTitleInBetCSS,
+    streamBetCustomVoteCSS,
     streamBetCustomVoteJS,
-    streamBetMainDiv,
+    streamBetMainDivXP,
     streamBetVoteInputXP,
     streamBetVoteButtonXP,
     streamBetVoteInputJS,
     streamBetVoteButtonJS,
+    streamBetTermsAcceptCSS,
+    streamBetTermsAcceptJS,
     localStorageJS,
     clearStyleChatJS,
     maximizeBetWindowJS,
@@ -126,7 +128,7 @@ class TwitchBrowser:
         self.browser.add_cookie(cookie)
         time.sleep(random.uniform(2.5, 3.5))
 
-        self.__click_when_exist(cookiePolicyQuery, By.CSS_SELECTOR, suppress_error=True)
+        self.__click_when_exist(cookiePolicyCSS, By.CSS_SELECTOR, suppress_error=True)
         time.sleep(random.uniform(0.5, 1.5))
 
         # Edit value in localStorage for dark theme, point consent etc.
@@ -328,7 +330,7 @@ class TwitchBrowser:
                 self.browser.get(event.streamer.chat_url)
                 time.sleep(random.uniform(3, 5))
                 self.__click_when_exist(
-                    cookiePolicyQuery, By.CSS_SELECTOR, suppress_error=True, timeout=1.5
+                    cookiePolicyCSS, By.CSS_SELECTOR, suppress_error=True, timeout=1.5
                 )
 
                 # Hide the chat ... Don't ask me why
@@ -362,7 +364,7 @@ class TwitchBrowser:
                 try:
                     WebDriverWait(self.browser, 1).until(
                         expected_conditions.visibility_of_element_located(
-                            (By.XPATH, streamBetMainDiv)
+                            (By.XPATH, streamBetMainDivXP)
                         )
                     )
                     div_bet_is_open = True
@@ -403,6 +405,13 @@ class TwitchBrowser:
                                     extra={"emoji": ":wrench:"},
                                 )
                                 if self.__click_on_vote(event, selector_index) is True:
+
+                                    if self.__accept_bet_terms(event, timeout=1.5):
+                                        logger.info(
+                                            "Agree to Predictions Terms & Conditions",
+                                            extra={"emoji": ":wrench:"},
+                                        )
+
                                     event.bet_placed = True
                                     time.sleep(random.uniform(5, 10))
                         except Exception:
@@ -438,7 +447,7 @@ class TwitchBrowser:
 
     def __click_on_bet(self, event, maximize_div=True):
         logger.info(f"Click on the bet for {event}", extra={"emoji": ":wrench:"})
-        if self.__click_when_exist(streamBetTitleInBet, By.CSS_SELECTOR) is True:
+        if self.__click_when_exist(streamBetTitleInBetCSS, By.CSS_SELECTOR) is True:
             time.sleep(random.uniform(0.01, 0.1))
             if maximize_div is True:
                 # Edit the css for make the window full-screen in browser. Another useless change
@@ -458,7 +467,7 @@ class TwitchBrowser:
             if self.__execute_script(scrollDownBetWindowJS) is False:
                 logger.error("Unable to scroll down in the bet window")
 
-        status = self.__click_when_exist(streamBetCustomVoteXP, By.CSS_SELECTOR)
+        status = self.__click_when_exist(streamBetCustomVoteCSS, By.CSS_SELECTOR)
         if status is False:
             status = self.__execute_script(streamBetCustomVoteJS)
 
@@ -500,5 +509,15 @@ class TwitchBrowser:
 
         if status is True:
             self.__debug(event, "click_on_vote")
+            return True
+        return False
+
+    def __accept_bet_terms(self, event, timeout=1.5):
+        status = self.__click_when_exist(streamBetTermsAcceptCSS, By.CSS_SELECTOR, suppress_error=True, timeout=timeout)
+        if status is False:
+            status = self.__execute_script(streamBetTermsAcceptJS, suppress_error=True)
+
+        if status is True:
+            self.__debug(event, "accept_bet_term")
             return True
         return False

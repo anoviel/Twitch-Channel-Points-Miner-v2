@@ -7,25 +7,28 @@ TWITCH_CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36"
 
-# XPath Selector and Javascript helpers
-cookiePolicyQuery = 'button[data-a-target="consent-banner-accept"]'
+# XPath /CSS Selector and Javascript helpers
+cookiePolicyCSS = 'button[data-a-target="consent-banner-accept"]'
 
 streamCoinsMenuXP = '//div[@data-test-selector="community-points-summary"]//button'
 streamCoinsMenuJS = 'document.querySelector("[data-test-selector=\'community-points-summary\']").getElementsByTagName("button")[0].click();'
 
-streamBetTitleInBet = '[data-test-selector="predictions-list-item__title"]'
+streamBetTitleInBetCSS = '[data-test-selector="predictions-list-item__title"]'
 
-streamBetCustomVoteXP = (
+streamBetCustomVoteCSS = (
     "button[data-test-selector='prediction-checkout-active-footer__input-type-toggle']"
 )
-streamBetCustomVoteJS = f'document.querySelector("{streamBetCustomVoteXP}").click();'
+streamBetCustomVoteJS = f'document.querySelector("{streamBetCustomVoteCSS}").click();'
 
-streamBetMainDiv = "//div[@id='channel-points-reward-center-body']//div[contains(@class,'custom-prediction-button')]"
-streamBetVoteInputXP = f"({streamBetMainDiv}//input)"
-streamBetVoteButtonXP = f"({streamBetMainDiv}//button)"
+streamBetMainDivXP = "//div[@id='channel-points-reward-center-body']//div[contains(@class,'custom-prediction-button')]"
+streamBetVoteInputXP = f"({streamBetMainDivXP}//input)"
+streamBetVoteButtonXP = f"({streamBetMainDivXP}//button)"
 
 streamBetVoteInputJS = 'document.getElementById("channel-points-reward-center-body").getElementsByTagName("input")[{}].value = {};'
 streamBetVoteButtonJS = 'document.getElementById("channel-points-reward-center-body").getElementsByTagName("button")[{}].click();'
+
+streamBetTermsAcceptCSS = "button[data-test-selector='prediction-terms-step__accept-button']"
+streamBetTermsAcceptJS = f'document.querySelector("{streamBetTermsAcceptCSS}").click();'
 
 # Some Javascript code that should help the script
 localStorageJS = """
