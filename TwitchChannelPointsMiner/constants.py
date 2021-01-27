@@ -27,7 +27,9 @@ streamBetVoteButtonXP = f"({streamBetMainDivXP}//button)"
 streamBetVoteInputJS = 'document.getElementById("channel-points-reward-center-body").getElementsByTagName("input")[{}].value = {};'
 streamBetVoteButtonJS = 'document.getElementById("channel-points-reward-center-body").getElementsByTagName("button")[{}].click();'
 
-streamBetTermsAcceptCSS = "button[data-test-selector='prediction-terms-step__accept-button']"
+streamBetTermsAcceptCSS = (
+    "button[data-test-selector='prediction-terms-step__accept-button']"
+)
 streamBetTermsAcceptJS = f'document.querySelector("{streamBetTermsAcceptCSS}").click();'
 
 # Some Javascript code that should help the script

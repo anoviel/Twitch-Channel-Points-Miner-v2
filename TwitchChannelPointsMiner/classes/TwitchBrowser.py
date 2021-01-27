@@ -99,12 +99,17 @@ class TwitchBrowser:
             self.__init_firefox()
         elif self.settings.browser == Browser.CHROME:
             self.__init_chrome()
+        else:
+            logger.critical(f"{self.settings.browser} not supported! Close the script")
+            exit(1)
 
         if self.browser is not None:
             self.browser.set_window_size(450, 800)
             self.browser.implicitly_wait(self.settings.implicitly_wait)
-
-        self.__init_twitch()
+            self.__init_twitch()
+        else:
+            logger.critical("Something went wrong! Unable to start the browser. Close the script")
+            exit(1)
 
     def __init_twitch(self):
         logger.debug(
@@ -289,7 +294,12 @@ class TwitchBrowser:
             )
 
     def __click_when_exist(
-        self, selector, by: By = By.CSS_SELECTOR, suppress_error=False, timeout=None
+        self,
+        selector,
+        by: By = By.CSS_SELECTOR,
+        suppress_error=False,
+        timeout=None,
+        javascript=None,
     ):
         timeout = self.settings.timeout if timeout is None else timeout
         try:
@@ -301,10 +311,19 @@ class TwitchBrowser:
         except Exception:
             if suppress_error is False:
                 logger.error(f"Exception raised with: {selector}", exc_info=True)
+
+            if javascript is not None:
+                return self.__execute_script(javascript, suppress_error=suppress_error)
+
         return False
 
     def __send_text(
-        self, selector, text, by: By = By.CSS_SELECTOR, suppress_error=False
+        self,
+        selector,
+        text,
+        by: By = By.CSS_SELECTOR,
+        suppress_error=False,
+        javascript=None,
     ):
         try:
             element = WebDriverWait(self.browser, self.settings.timeout).until(
@@ -317,6 +336,10 @@ class TwitchBrowser:
         except Exception:
             if suppress_error is False:
                 logger.error(f"Exception raised with: {selector}", exc_info=True)
+
+            if javascript is not None:
+                return self.__execute_script(javascript)
+
         return False
 
     def start_bet(self, event: EventPrediction):
@@ -435,11 +458,12 @@ class TwitchBrowser:
 
     def __open_coins_menu(self, event: EventPrediction):
         logger.info(f"Open coins menu for {event}", extra={"emoji": ":wrench:"})
-        status = self.__click_when_exist(streamCoinsMenuXP, By.XPATH)
-        if status is False:
-            status = self.__execute_script(streamCoinsMenuJS)
-
-        if status is True:
+        if (
+            self.__click_when_exist(
+                streamCoinsMenuXP, By.XPATH, javascript=streamCoinsMenuJS
+            )
+            is True
+        ):
             time.sleep(random.uniform(0.01, 0.1))
             self.__debug(event, "open_coins_menu")
             return True
@@ -467,11 +491,14 @@ class TwitchBrowser:
             if self.__execute_script(scrollDownBetWindowJS) is False:
                 logger.error("Unable to scroll down in the bet window")
 
-        status = self.__click_when_exist(streamBetCustomVoteCSS, By.CSS_SELECTOR)
-        if status is False:
-            status = self.__execute_script(streamBetCustomVoteJS)
-
-        if status is True:
+        if (
+            self.__click_when_exist(
+                streamBetCustomVoteCSS,
+                By.CSS_SELECTOR,
+                javascript=streamBetCustomVoteJS,
+            )
+            is True
+        ):
             time.sleep(random.uniform(0.01, 0.1))
             self.__debug(event, "enable_custom_bet_value")
             event.box_fillable = True
@@ -485,39 +512,45 @@ class TwitchBrowser:
 
     def __send_text_on_bet(self, event, selector_index, text):
         self.__debug(event, "before__send_text")
-        status = self.__send_text(
-            f"{streamBetVoteInputXP}[{selector_index}]", text, By.XPATH
-        )
-        if status is False:
-            status = self.__execute_script(
-                streamBetVoteInputJS.format(int(selector_index) - 1, int(text))
+        if (
+            self.__send_text(
+                f"{streamBetVoteInputXP}[{selector_index}]",
+                text,
+                By.XPATH,
+                javascript=streamBetVoteInputJS.format(
+                    int(selector_index) - 1, int(text)
+                ),
             )
-
-        if status is True:
+            is True
+        ):
             self.__debug(event, "send_text")
             return True
         return False
 
     def __click_on_vote(self, event, selector_index):
-        status = self.__click_when_exist(
-            f"{streamBetVoteButtonXP}[{selector_index}]", By.XPATH
-        )
-        if status is False:
-            status = self.__execute_script(
-                streamBetVoteButtonJS.format(int(selector_index) - 1)
+        if (
+            self.__click_when_exist(
+                f"{streamBetVoteButtonXP}[{selector_index}]",
+                By.XPATH,
+                javascript=streamBetVoteButtonJS.format(int(selector_index) - 1),
             )
-
-        if status is True:
+            is True
+        ):
             self.__debug(event, "click_on_vote")
             return True
         return False
 
     def __accept_bet_terms(self, event, timeout=1.5):
-        status = self.__click_when_exist(streamBetTermsAcceptCSS, By.CSS_SELECTOR, suppress_error=True, timeout=timeout)
-        if status is False:
-            status = self.__execute_script(streamBetTermsAcceptJS, suppress_error=True)
-
-        if status is True:
+        if (
+            self.__click_when_exist(
+                streamBetTermsAcceptCSS,
+                By.CSS_SELECTOR,
+                suppress_error=True,
+                timeout=timeout,
+                javascript=streamBetTermsAcceptJS,
+            )
+            is True
+        ):
             self.__debug(event, "accept_bet_term")
             return True
         return False
