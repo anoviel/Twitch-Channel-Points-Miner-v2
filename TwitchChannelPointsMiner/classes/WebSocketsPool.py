@@ -1,21 +1,23 @@
+import json
 import logging
+import random
 import threading
 import time
-import json
-import random
 
 from dateutil import parser
+from millify import millify
 
 from TwitchChannelPointsMiner.classes.EventPrediction import EventPrediction
+from TwitchChannelPointsMiner.classes.Exceptions import TimeBasedDropNotFound
+from TwitchChannelPointsMiner.classes.Message import Message
 from TwitchChannelPointsMiner.classes.Raid import Raid
 from TwitchChannelPointsMiner.classes.TwitchWebSocket import TwitchWebSocket
-from TwitchChannelPointsMiner.classes.Message import Message
+from TwitchChannelPointsMiner.constants.twitch import WEBSOCKET
 from TwitchChannelPointsMiner.utils import (
-    get_streamer_index,
-    calculate_start_after,
     bet_condition,
+    calculate_start_after,
+    get_streamer_index,
 )
-from TwitchChannelPointsMiner.constants import TWITCH_WEBSOCKET
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +61,7 @@ class WebSocketsPool:
 
     def create_new_websocket(self):
         self.ws = TwitchWebSocket(
-            TWITCH_WEBSOCKET,
+            WEBSOCKET,
             on_message=WebSocketsPool.on_message,
             on_open=WebSocketsPool.on_open,
             on_close=WebSocketsPool.handle_websocket_reconnection,
@@ -266,7 +268,7 @@ class WebSocketsPool:
                             if message.type == "prediction-result":
                                 event_result = message.data["prediction"]["result"]
                                 logger.info(
-                                    f"{ws.events_predictions[event_id]} - Result: {event_result['type']}, Points won: {event_result['points_won'] if event_result['points_won'] else 0}",
+                                    f"{ws.events_predictions[event_id]} - Result: {event_result['type']}, Points won: {millify(event_result['points_won']) if event_result['points_won'] else 0}",
                                     extra={"emoji": ":bar_chart:"},
                                 )
                                 points_won = (
@@ -280,6 +282,34 @@ class WebSocketsPool:
                                 }
                             elif message.type == "prediction-made":
                                 ws.events_predictions[event_id].bet_confirmed = True
+
+                    elif message.topic == "user-drop-events":
+                        if message.type == "drop-progress":
+                            current = message.data["current_progress_min"]
+                            required = message.data["required_progress_min"]
+                            if current >= required:
+                                try:
+                                    drop = ws.twitch.search_drop_in_inventory(
+                                        ws.streamers[streamer_index],
+                                        message.data["drop_id"],
+                                    )
+                                    if drop["dropInstanceID"] is not None:
+                                        ws.twitch.claim_drop(
+                                            drop["dropInstanceID"],
+                                            ws.streamers[streamer_index],
+                                        )
+                                except TimeBasedDropNotFound:
+                                    logger.error(
+                                        f"Unable to find {message.data['drop_id']} in your inventory"
+                                    )
+                            else:
+                                # Skip 0% and 100% ...
+                                percentage_state = int((current / required) * 100)
+                                if percentage_state != 0 and percentage_state % 25 == 0:
+                                    logger.info(
+                                        f"Drop event {percentage_state}% for {ws.streamers[streamer_index]}!",
+                                        extra={"emoji": ":package:"},
+                                    )
 
                 except Exception:
                     logger.error(

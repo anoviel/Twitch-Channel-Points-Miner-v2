@@ -1,44 +1,23 @@
-import time
 import logging
-import random
 import os
 import platform
+import random
+import time
+from enum import Enum, auto
+from pathlib import Path
 
 from millify import prettify
-from pathlib import Path
-from datetime import datetime
-from enum import Enum, auto
-from PIL import Image, ImageDraw, ImageFont
-
 from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions
-from selenium.webdriver.common.by import By
+from selenium.common.exceptions import JavascriptException, TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
-from selenium.common.exceptions import TimeoutException, JavascriptException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.support.ui import WebDriverWait
 
 from TwitchChannelPointsMiner.classes.EventPrediction import EventPrediction
-from TwitchChannelPointsMiner.utils import bet_condition
-from TwitchChannelPointsMiner.constants import (
-    TWITCH_URL,
-    cookiePolicyCSS,
-    streamCoinsMenuXP,
-    streamCoinsMenuJS,
-    streamBetTitleInBetCSS,
-    streamBetCustomVoteCSS,
-    streamBetCustomVoteJS,
-    streamBetMainDivXP,
-    streamBetVoteInputXP,
-    streamBetVoteButtonXP,
-    streamBetVoteInputJS,
-    streamBetVoteButtonJS,
-    streamBetTermsAcceptCSS,
-    streamBetTermsAcceptJS,
-    localStorageJS,
-    clearStyleChatJS,
-    maximizeBetWindowJS,
-    scrollDownBetWindowJS,
-)
+from TwitchChannelPointsMiner.constants.browser import Javascript, Selectors
+from TwitchChannelPointsMiner.constants.twitch import URL
+from TwitchChannelPointsMiner.utils import bet_condition, get_user_agent
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +87,9 @@ class TwitchBrowser:
             self.browser.implicitly_wait(self.settings.implicitly_wait)
             self.__init_twitch()
         else:
-            logger.critical("Something went wrong! Unable to start the browser. Close the script")
+            logger.critical(
+                "Something went wrong! Unable to start the browser. Close the script"
+            )
             exit(1)
 
     def __init_twitch(self):
@@ -129,15 +110,17 @@ class TwitchBrowser:
             "id": 1,
             "value": self.auth_token,
         }
-        self.browser.get(TWITCH_URL)
+        self.browser.get(URL)
         self.browser.add_cookie(cookie)
         time.sleep(random.uniform(2.5, 3.5))
 
-        self.__click_when_exist(cookiePolicyCSS, By.CSS_SELECTOR, suppress_error=True)
+        self.__click_when_exist(
+            Selectors.cookiePolicy, By.CSS_SELECTOR, suppress_error=True
+        )
         time.sleep(random.uniform(0.5, 1.5))
 
         # Edit value in localStorage for dark theme, point consent etc.
-        self.__execute_script(localStorageJS)
+        self.__execute_script(Javascript.localStorage)
         time.sleep(random.uniform(0.5, 1.5))
         self.__blank()
 
@@ -169,9 +152,7 @@ class TwitchBrowser:
         options.add_argument("no-sandbox")
         options.add_argument("disable-setuid-sandbox")
         options.add_argument("disable-infobars")
-        options.add_argument(
-            "user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.141 Safari/537.36"
-        )
+        options.add_argument(f"user-agent={get_user_agent(self.settings.browser)}")
 
         options.add_experimental_option(
             "prefs", {"profile.managed_default_content_settings.images": 2}
@@ -185,7 +166,7 @@ class TwitchBrowser:
             self.browser = webdriver.Chrome(self.settings.driver_path, options=options)
         else:
             logger.warning(
-                f"The path {self.settings.driver_path} is not valid. Use default path",
+                f"The path {self.settings.driver_path} is not valid. Using default path...",
                 extra={"emoji": ":wrench:"},
             )
             self.browser = webdriver.Chrome(options=options)
@@ -207,7 +188,7 @@ class TwitchBrowser:
         fp.set_preference("startup.homepage_welcome_url.additional", "about:blank")
         fp.set_preference(
             "general.useragent.override",
-            "Mozilla/5.0 (Windows NT 10.0; WOW64; rv:56.0) Gecko/20100101 Firefox/56.0",
+            get_user_agent(self.settings.browser),
         )
 
         if os.path.isfile(self.settings.driver_path) is True:
@@ -218,7 +199,7 @@ class TwitchBrowser:
             )
         else:
             logger.warning(
-                f"The path {self.settings.driver_path} is not valid. Use default path",
+                f"The path {self.settings.driver_path} is not valid. Using default path...",
                 extra={"emoji": ":wrench:"},
             )
             self.browser = webdriver.Firefox(options=options, firefox_profile=fp)
@@ -245,7 +226,7 @@ class TwitchBrowser:
         with open(fname, "w", encoding="utf-8") as writer:
             writer.write(self.browser.page_source)
 
-    def screenshot(self, fname, write_timestamp=False):
+    def screenshot(self, fname):
         screenshots_path = os.path.join(Path().absolute(), "screenshots")
         Path(screenshots_path).mkdir(parents=True, exist_ok=True)
         Path(os.path.join(screenshots_path, self.session_id)).mkdir(
@@ -259,40 +240,6 @@ class TwitchBrowser:
         time.sleep(0.1)
         self.browser.save_screenshot(fname)
 
-        try:
-            if write_timestamp is True:
-                time.sleep(0.5)
-                image = Image.open(fname)
-                draw = ImageDraw.Draw(image)
-
-                font = ImageFont.truetype(
-                    os.path.join(Path().absolute(), "assets", "Roboto-Bold.ttf"),
-                    size=35,
-                )
-                (x, y) = (15, image.height // 3)
-                datetime_text = datetime.now().strftime("%d/%m %H:%M:%S.%f")
-
-                shadowcolor = "rgb(0, 0, 0)"  # black color
-                # Thin border
-                draw.text((x - 1, y), datetime_text, font=font, fill=shadowcolor)
-                draw.text((x + 1, y), datetime_text, font=font, fill=shadowcolor)
-                draw.text((x, y - 1), datetime_text, font=font, fill=shadowcolor)
-                draw.text((x, y + 1), datetime_text, font=font, fill=shadowcolor)
-
-                # Thicker border
-                draw.text((x - 1, y - 1), datetime_text, font=font, fill=shadowcolor)
-                draw.text((x + 1, y - 1), datetime_text, font=font, fill=shadowcolor)
-                draw.text((x - 1, y + 1), datetime_text, font=font, fill=shadowcolor)
-                draw.text((x + 1, y + 1), datetime_text, font=font, fill=shadowcolor)
-
-                color = "rgb(255, 255, 255)"  # white color
-                draw.text((x, y), datetime_text, font=font, fill=color)
-                image.save(fname, optimize=True, quality=20)
-        except Exception:
-            logger.error(
-                f"Exception raised during screenshot file {fname}", exc_info=True
-            )
-
     def __click_when_exist(
         self,
         selector,
@@ -300,7 +247,7 @@ class TwitchBrowser:
         suppress_error=False,
         timeout=None,
         javascript=None,
-    ):
+    ) -> bool:
         timeout = self.settings.timeout if timeout is None else timeout
         try:
             element = WebDriverWait(self.browser, timeout).until(
@@ -324,7 +271,7 @@ class TwitchBrowser:
         by: By = By.CSS_SELECTOR,
         suppress_error=False,
         javascript=None,
-    ):
+    ) -> bool:
         try:
             element = WebDriverWait(self.browser, self.settings.timeout).until(
                 expected_conditions.element_to_be_clickable((by, selector))
@@ -347,17 +294,20 @@ class TwitchBrowser:
         if bet_condition(self, event, logger) is True:
             for attempt in range(0, self.settings.max_attempts):
                 logger.info(
-                    f"Start betting for {event} owned by {event.streamer}",
+                    f"Starting betting for {event} owned by {event.streamer}",
                     extra={"emoji": ":wrench:"},
                 )
                 self.browser.get(event.streamer.chat_url)
                 time.sleep(random.uniform(3, 5))
                 self.__click_when_exist(
-                    cookiePolicyCSS, By.CSS_SELECTOR, suppress_error=True, timeout=1.5
+                    Selectors.cookiePolicy,
+                    By.CSS_SELECTOR,
+                    suppress_error=True,
+                    timeout=1.5,
                 )
 
                 # Hide the chat ... Don't ask me why
-                self.__execute_script(clearStyleChatJS, suppress_error=True)
+                self.__execute_script(Javascript.clearStyleChat, suppress_error=True)
 
                 if self.__bet_chains_methods(event) is True:
                     return self.currently_is_betting, time.time() - start_time
@@ -367,7 +317,7 @@ class TwitchBrowser:
             self.__blank()  # If we fail return to blank page
         return False, time.time() - start_time
 
-    def __bet_chains_methods(self, event):
+    def __bet_chains_methods(self, event) -> bool:
         if self.__open_coins_menu(event) is True:
             if self.__click_on_bet(event) is True:
                 if self.__enable_custom_bet_value(event) is True:
@@ -387,25 +337,25 @@ class TwitchBrowser:
                 try:
                     WebDriverWait(self.browser, 1).until(
                         expected_conditions.visibility_of_element_located(
-                            (By.XPATH, streamBetMainDivXP)
+                            (By.XPATH, Selectors.betMainDivXP)
                         )
                     )
                     div_bet_is_open = True
                 except TimeoutException:
                     logger.info(
-                        "The bet div was not found, maybe It was closed. Attempt to open again, hope to be in time",
+                        "The bet div was not found, maybe It was closed. Attempting to open again... Hopefully in time!",
                         extra={"emoji": ":wrench:"},
                     )
                     div_bet_is_open = self.__bet_chains_methods(event)
                     if div_bet_is_open is True:
                         logger.info(
-                            "Success! Bet div is now open, we can complete the bet",
+                            "Success! Bet div is now open, we can complete the bet!",
                             extra={"emoji": ":wrench:"},
                         )
 
                 if div_bet_is_open is True:
                     decision = event.bet.calculate(event.streamer.channel_points)
-                    if decision["choice"]:
+                    if decision["choice"] is not None:
                         selector_index = 1 if decision["choice"] == "A" else 2
                         logger.info(
                             f"Decision: {event.bet.get_outcome(selector_index - 1)}",
@@ -441,7 +391,7 @@ class TwitchBrowser:
                             logger.error("Exception raised", exc_info=True)
                 else:
                     logger.info(
-                        "Sorry, unable to complete the bet. The bet div still closed"
+                        "Sorry, unable to complete the bet. The bet div is still closed!"
                     )
             else:
                 logger.info(
@@ -449,7 +399,7 @@ class TwitchBrowser:
                 )
         else:
             logger.info(
-                f"Oh no! The event It's not more ACTIVE, current status: {event.status}",
+                f"Oh no! The event is not active anymore! Current status: {event.status}",
                 extra={"emoji": ":disappointed_relieved:"},
             )
 
@@ -460,7 +410,7 @@ class TwitchBrowser:
         logger.info(f"Open coins menu for {event}", extra={"emoji": ":wrench:"})
         if (
             self.__click_when_exist(
-                streamCoinsMenuXP, By.XPATH, javascript=streamCoinsMenuJS
+                Selectors.coinsMenuXP, By.XPATH, javascript=Javascript.coinsMenu
             )
             is True
         ):
@@ -469,18 +419,18 @@ class TwitchBrowser:
             return True
         return False
 
-    def __click_on_bet(self, event, maximize_div=True):
-        logger.info(f"Click on the bet for {event}", extra={"emoji": ":wrench:"})
-        if self.__click_when_exist(streamBetTitleInBetCSS, By.CSS_SELECTOR) is True:
+    def __click_on_bet(self, event, maximize_div=True) -> bool:
+        logger.info(f"Clicking on the bet for {event}", extra={"emoji": ":wrench:"})
+        if self.__click_when_exist(Selectors.betTitle, By.CSS_SELECTOR) is True:
             time.sleep(random.uniform(0.01, 0.1))
             if maximize_div is True:
                 # Edit the css for make the window full-screen in browser. Another useless change
-                self.__execute_script(maximizeBetWindowJS, suppress_error=True)
+                self.__execute_script(Javascript.maximizeBetWindow, suppress_error=True)
             self.__debug(event, "click_on_bet")
             return True
         return False
 
-    def __enable_custom_bet_value(self, event, scroll_down=True):
+    def __enable_custom_bet_value(self, event, scroll_down=True) -> bool:
         logger.info(
             f"Enable input of custom value for {event}",
             extra={"emoji": ":wrench:"},
@@ -488,14 +438,14 @@ class TwitchBrowser:
 
         if scroll_down is True:
             time.sleep(random.uniform(0.01, 0.1))
-            if self.__execute_script(scrollDownBetWindowJS) is False:
-                logger.error("Unable to scroll down in the bet window")
+            if self.__execute_script(Javascript.scrollDownBetWindow) is False:
+                logger.error("Unable to scroll down in the bet window!")
 
         if (
             self.__click_when_exist(
-                streamBetCustomVoteCSS,
+                Selectors.betCustomVote,
                 By.CSS_SELECTOR,
-                javascript=streamBetCustomVoteJS,
+                javascript=Javascript.betCustomVote,
             )
             is True
         ):
@@ -506,18 +456,18 @@ class TwitchBrowser:
             return True
         else:
             logger.info(
-                "Something went wrong unable to continue with betting - Fillable box not avaible"
+                "Something went wrong unable to continue with betting - Fillable box not available!"
             )
         return False
 
-    def __send_text_on_bet(self, event, selector_index, text):
+    def __send_text_on_bet(self, event, selector_index, text) -> bool:
         self.__debug(event, "before__send_text")
         if (
             self.__send_text(
-                f"{streamBetVoteInputXP}[{selector_index}]",
+                f"{Selectors.betVoteInputXP}[{selector_index}]",
                 text,
                 By.XPATH,
-                javascript=streamBetVoteInputJS.format(
+                javascript=Javascript.betVoteInput.format(
                     int(selector_index) - 1, int(text)
                 ),
             )
@@ -527,12 +477,12 @@ class TwitchBrowser:
             return True
         return False
 
-    def __click_on_vote(self, event, selector_index):
+    def __click_on_vote(self, event, selector_index) -> bool:
         if (
             self.__click_when_exist(
-                f"{streamBetVoteButtonXP}[{selector_index}]",
+                f"{Selectors.betVoteButtonXP}[{selector_index}]",
                 By.XPATH,
-                javascript=streamBetVoteButtonJS.format(int(selector_index) - 1),
+                javascript=Javascript.betVoteButton.format(int(selector_index) - 1),
             )
             is True
         ):
@@ -543,11 +493,11 @@ class TwitchBrowser:
     def __accept_bet_terms(self, event, timeout=1.5):
         if (
             self.__click_when_exist(
-                streamBetTermsAcceptCSS,
+                Selectors.betTermsAcceptCSS,
                 By.CSS_SELECTOR,
                 suppress_error=True,
                 timeout=timeout,
-                javascript=streamBetTermsAcceptJS,
+                javascript=Javascript.betTermsAccept,
             )
             is True
         ):
